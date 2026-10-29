@@ -1,0 +1,89 @@
+name: vetcare
+
+services:
+
+  db:
+    image: postgres:18
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: vetcare_docker
+      POSTGRES_USER: vetcare
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Debes configurar POSTGRES_PASSWORD}
+
+    volumes:
+      - vetcare-db-data:/var/lib/postgresql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vetcare -d vetcare_docker"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+    networks:
+      - vetcare-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    restart: unless-stopped
+
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/vetcare_docker
+      DB_USER: vetcare
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Debes configurar POSTGRES_PASSWORD}
+
+      JWT_SECRET: ${JWT_SECRET:?Debes configurar JWT_SECRET}
+
+      VETCARE_BOOTSTRAP_ADMIN_ENABLED: ${VETCARE_BOOTSTRAP_ADMIN_ENABLED:-false}
+      VETCARE_ADMIN_NOMBRES: ${VETCARE_ADMIN_NOMBRES}
+      VETCARE_ADMIN_APELLIDOS: ${VETCARE_ADMIN_APELLIDOS}
+      VETCARE_ADMIN_TIPO_DOCUMENTO: ${VETCARE_ADMIN_TIPO_DOCUMENTO}
+      VETCARE_ADMIN_NRO_DOCUMENTO: ${VETCARE_ADMIN_NRO_DOCUMENTO}
+      VETCARE_ADMIN_CORREO: ${VETCARE_ADMIN_CORREO}
+      VETCARE_ADMIN_PASSWORD: ${VETCARE_ADMIN_PASSWORD}
+
+      VETCARE_CORS_ORIGINS: "http://localhost:5173,http://localhost:8088"
+      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: none
+
+      VETCARE_HISTORIAS_DIR: /app/uploads/historias
+      SPRING_APPLICATION_JSON: '{"vetcare":{"perfiles":{"directorio":"/app/uploads/perfiles"}}}'
+
+      VETCARE_CORREO_HABILITADO: "false"
+
+    volumes:
+      - vetcare-uploads-data:/app/uploads
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    networks:
+      - vetcare-network
+
+  frontend:
+    build:
+      context: ../vetcare-frontend
+      dockerfile: Dockerfile
+
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:8088:80"
+
+    depends_on:
+      - backend
+
+    networks:
+      - vetcare-network
+
+networks:
+  vetcare-network:
+    driver: bridge
+
+volumes:
+  vetcare-db-data:
+  vetcare-uploads-data:

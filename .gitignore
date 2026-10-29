@@ -1,0 +1,70 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+# Fotos cargadas localmente; no versionar datos personales
+uploads/
+
+# VetCare - Protección adicional para despliegue
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Respaldos y archivos locales
+*.backup
+*.dump
+*.bak
+*.sql.gz
+*.patch
+.DS_Store
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+
+# VetCare - protección de la copia independiente
+node_modules/
+dist/
+*.bak
+*.backup
+*.zip
+
+# Copia de configuracion anterior
+compose-original.yaml
+
+# Capturas y evidencias internas
+evidencias-*/
