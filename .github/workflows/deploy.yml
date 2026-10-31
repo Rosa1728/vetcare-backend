@@ -23,7 +23,7 @@ jobs:
           chmod 700 ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H 138.36.238.158 >> ~/.ssh/known_hosts
+          ssh-keyscan -T 30 -t ed25519 -H 138.36.238.158 >> ~/.ssh/known_hosts
 
       - name: Desplegar VetCare
         run: |
