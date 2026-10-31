@@ -3,6 +3,7 @@ package pe.edu.utec.vetcare.service;
 import pe.edu.utec.vetcare.dto.response.UsuarioResponse;
 import pe.edu.utec.vetcare.dto.request.ActualizarPerfilPropietarioRequest;
 import pe.edu.utec.vetcare.dto.request.PropietarioRequest;
+import pe.edu.utec.vetcare.dto.request.ActualizarUsuarioRequest;
 import pe.edu.utec.vetcare.dto.response.PropietarioResponse;
 
 import java.util.List;
@@ -21,7 +22,7 @@ public interface PropietarioService {
 
     PropietarioResponse actualizar(
             Long id,
-            PropietarioRequest request
+            ActualizarUsuarioRequest request
     );
 
     PropietarioResponse actualizarMiDireccion(String direccion);

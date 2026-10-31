@@ -37,7 +37,7 @@ public class UsuarioServiceImpl
         pe.edu.utec.vetcare.security.AccesoClinico.soloAdmin();
         return usuarioRepository.findAll()
                 .stream()
-                .map(usuarioMapper::toResponse)
+                .map(this::respuestaConContacto)
                 .toList();
     }
 
@@ -47,10 +47,7 @@ public class UsuarioServiceImpl
         pe.edu.utec.vetcare.security.AccesoClinico.soloAdmin();
 
         var entity = buscarUsuario(id);
-        var response = usuarioMapper.toResponse(entity);
-        if (entity.getRol()!=null && "PROPIETARIO".equals(entity.getRol().getNombre()))
-            propietarios.findByUsuarioIdUsuario(id).ifPresent(p -> response.setDireccionContacto(p.getDireccion()));
-        return response;
+        return respuestaConContacto(entity);
     }
 
     @Override
@@ -87,18 +84,15 @@ public class UsuarioServiceImpl
     public UsuarioResponse actualizar(Long id, ActualizarUsuarioRequest request) {
         pe.edu.utec.vetcare.security.AccesoClinico.soloAdmin();
         UsuarioEntity entity = buscarUsuario(id);
-        if (request.getIdRol()!=null && !request.getIdRol().equals(entity.getRol().getIdRol())) throw new BadRequestException("El rol no se modifica desde Editar usuario; conserva las vinculaciones existentes");
-
-        if (usuarioRepository.existsByCorreoAndIdUsuarioNot(request.getCorreo(), id)) {
-            throw new BadRequestException("El correo ya se encuentra registrado");
+        var perfil = "PROPIETARIO".equals(entity.getRol().getNombre()) ? propietarios.findByUsuarioIdUsuario(id) : java.util.Optional.<pe.edu.utec.vetcare.entity.PropietarioEntity>empty();
+        pe.edu.utec.vetcare.validation.ContactoEdicion.validar(request.getNroCelular(),request.getDireccion(),perfil.isPresent());
+        if(request.getNroCelular()!=null)entity.setNroCelular(request.getNroCelular());
+        if(request.getDireccion()!=null) {
+            if(perfil.isPresent()) { perfil.get().setDireccion(request.getDireccion());propietarios.saveAndFlush(perfil.get()); }
+            else entity.setDireccionContacto(request.getDireccion());
         }
-        if (usuarioRepository.existsByNroDocumentoAndIdUsuarioNot(request.getNroDocumento(), id)) {
-            throw new BadRequestException("El documento ya se encuentra registrado");
-        }
-
-        usuarioMapper.updateEntity(request, entity);
-        // La contraseña y el rol permanecen intactos en esta operación.
-        return usuarioMapper.toResponse(usuarioRepository.save(entity));
+        usuarioRepository.saveAndFlush(entity);
+        return respuestaConContacto(entity);
     }
 
     @Override
@@ -121,6 +115,13 @@ public class UsuarioServiceImpl
         if (veterinarios.existsByUsuario_IdUsuario(id) || propietarios.findByUsuarioIdUsuario(id).isPresent())
             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,"La cuenta tiene un perfil asociado que debe conservarse");
         usuarioRepository.delete(entity);
+    }
+
+    private UsuarioResponse respuestaConContacto(UsuarioEntity entity) {
+        var response=usuarioMapper.toResponse(entity);
+        if(entity.getRol()!=null&&"PROPIETARIO".equals(entity.getRol().getNombre()))
+            propietarios.findByUsuarioIdUsuario(entity.getIdUsuario()).ifPresent(p->response.setDireccionContacto(p.getDireccion()));
+        return response;
     }
 
     private UsuarioEntity buscarUsuario(Long id) {

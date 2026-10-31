@@ -34,7 +34,7 @@ class UsuariosHttpIT extends PostgresIntegrationSupport {
  }
  @Test void duplicadosYEdicionMantienenRolHashYPerfiles()throws Exception{
   long perfil=db.queryForObject("insert into veterinario(id_usuario,especialidad,nro_colegiatura) values (?,'General',?) returning id_veterinario",Long.class,vetId,tag);
-  var p=body("v",role("VETERINARIO"));p.remove("contrasena");String hash=db.queryForObject("select contrasena from usuario where id_usuario=?",String.class,vetId);
+  var p=new HashMap<String,Object>();p.put("nroCelular","987654321");p.put("direccion","Contacto actualizado");String hash=db.queryForObject("select contrasena from usuario where id_usuario=?",String.class,vetId);
   mvc.perform(put("/api/usuarios/{id}",vetId).header("Authorization",admin).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(p))).andExpect(status().isOk());
   p.put("idRol",roleAdmin);mvc.perform(put("/api/usuarios/{id}",vetId).header("Authorization",admin).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(p))).andExpect(status().isBadRequest());
   p.remove("idRol");p.put("correo",email("o"));mvc.perform(put("/api/usuarios/{id}",vetId).header("Authorization",admin).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(p))).andExpect(status().isBadRequest());
@@ -48,11 +48,11 @@ class UsuariosHttpIT extends PostgresIntegrationSupport {
   mvc.perform(delete("/api/usuarios/{id}",ownerId).header("Authorization",admin)).andExpect(status().isConflict());
   mvc.perform(delete("/api/usuarios/{id}",ownerId).header("Authorization",vet)).andExpect(status().isForbidden());assertEquals(1,db.queryForObject("select count(*) from usuario where id_usuario=?",Integer.class,ownerId));
  }
- @Test void cambiarCorreoInvalidaSesionAnteriorYConservaCredencial()throws Exception {
+ @Test void correoProtegidoConservaSesionYCredencial()throws Exception {
   var edit=body("o",roleOwner);edit.remove("contrasena");edit.put("correo",email("correo-nuevo"));
-  mvc.perform(put("/api/usuarios/{id}",ownerId).header("Authorization",admin).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(edit))).andExpect(status().isOk());
-  mvc.perform(get("/api/usuarios/me").header("Authorization",owner)).andExpect(status().isUnauthorized());
-  mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("correo",email("correo-nuevo"),"contrasena",password)))).andExpect(status().isOk());
+  mvc.perform(put("/api/usuarios/{id}",ownerId).header("Authorization",admin).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(edit))).andExpect(status().isBadRequest());
+  mvc.perform(get("/api/usuarios/me").header("Authorization",owner)).andExpect(status().isOk());
+  mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("correo",email("o"),"contrasena",password)))).andExpect(status().isOk());
  }
  @Test void rolVigenteSeCompruebaEnJwtAnteCambioExterno()throws Exception {
   db.update("update usuario set id_rol=? where id_usuario=?",roleOwner,adminId);

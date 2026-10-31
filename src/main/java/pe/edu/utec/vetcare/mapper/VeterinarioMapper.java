@@ -25,9 +25,8 @@ public interface VeterinarioMapper {
     @Mapping(target = "fotoDisponible", expression = "java(entity.getUsuario().getFotoPerfil() != null)")
     VeterinarioResponse toResponse(VeterinarioEntity entity);
 
-    @Mapping(target = "idVeterinario", ignore = true)
-    @Mapping(target = "usuario", ignore = true)
-    @Mapping(target = "tratamientoProfesional", ignore = true)
+    @org.mapstruct.BeanMapping(ignoreByDefault=true)
+    @Mapping(target="especialidad", source="especialidad")
     void updateEntity(
             UpdateVeterinarioRequest request,
             @MappingTarget VeterinarioEntity entity

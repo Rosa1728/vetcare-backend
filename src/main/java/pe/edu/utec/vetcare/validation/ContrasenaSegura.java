@@ -6,7 +6,7 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Constraint(validatedBy=ContrasenaSeguraValidator.class)
 public @interface ContrasenaSegura {
- String message() default "Usa al menos 8 caracteres, mayúscula, minúscula, número y símbolo; evita contraseñas comunes (máximo 72 bytes)";
+ String message() default "Revisa la contraseña.";
  Class<?>[] groups() default {};
  Class<? extends Payload>[] payload() default {};
 }

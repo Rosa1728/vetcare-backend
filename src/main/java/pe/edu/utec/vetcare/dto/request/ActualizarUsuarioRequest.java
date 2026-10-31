@@ -1,34 +1,20 @@
 package pe.edu.utec.vetcare.dto.request;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+/** Edición ordinaria: identidad, credenciales y relaciones no forman parte del contrato. */
 @Data
 public class ActualizarUsuarioRequest {
-    private Long idRol;
-    @NotBlank(message = "Los nombres son obligatorios")
-    @Size(max = 100)
-    private String nombres;
-
-    @NotBlank(message = "Los apellidos son obligatorios")
-    @Size(max = 100)
-    private String apellidos;
-
-    @NotBlank(message = "El tipo de documento es obligatorio")
-    @Size(max = 20)
-    private String tipoDocumento;
-
-    @NotBlank(message = "El número de documento es obligatorio")
-    @Size(max = 20)
-    private String nroDocumento;
-
-    @NotBlank(message = "El correo es obligatorio")
-    @Email(message = "El correo no tiene un formato válido")
-    @Size(max = 150)
-    private String correo;
-
-    @Size(max = 20)
+    @Size(max=20, message="El celular no puede superar 20 caracteres")
+    @Pattern(regexp="|[+]?[0-9][0-9 ()-]{5,19}", message="Ingresa un celular válido de 6 a 20 caracteres.")
     private String nroCelular;
+    @Size(max=200, message="La dirección no puede superar 200 caracteres")
+    private String direccion;
+
+    @com.fasterxml.jackson.annotation.JsonAnySetter
+    public void rechazarCampo(String nombre,Object valor) {
+        throw new pe.edu.utec.vetcare.exception.BadRequestException("La edición de contacto solo permite celular y dirección. Los datos de identificación y acceso están protegidos.");
+    }
 }

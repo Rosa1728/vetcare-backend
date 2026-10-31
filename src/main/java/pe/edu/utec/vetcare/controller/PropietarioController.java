@@ -12,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import pe.edu.utec.vetcare.dto.request.PropietarioRequest;
+import pe.edu.utec.vetcare.dto.request.ActualizarUsuarioRequest;
 import pe.edu.utec.vetcare.dto.request.ActualizarDireccionPropietarioRequest;
 import pe.edu.utec.vetcare.dto.response.PropietarioResponse;
 import pe.edu.utec.vetcare.service.PropietarioService;
@@ -83,7 +84,7 @@ public class PropietarioController {
     public PropietarioResponse actualizar(
             @PathVariable Long id,
             @Valid
-            @RequestBody PropietarioRequest request
+            @RequestBody ActualizarUsuarioRequest request
     ) {
 
         return propietarioService.actualizar(

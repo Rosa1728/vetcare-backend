@@ -39,7 +39,7 @@ class PropietariosAdminHttpIT extends PostgresIntegrationSupport {
  org.springframework.test.web.servlet.ResultActions update(String token,Map<String,Object> body)throws Exception{return mvc.perform(put("/api/propietarios/{id}",ownerId).header("Authorization",token).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body)));}
  @Test void contactoAdminSePersisteEnFuentesCanonicasYSeReflejaEnPerfiles()throws Exception{
   String hash=db.queryForObject("select contrasena from usuario where id_usuario=?",String.class,ownerUser);
-  update(admin,Map.of("idUsuario",ownerUser,"nroCelular","987654321","direccion","Dirección con acentos: Perú")).andExpect(status().isOk()).andExpect(jsonPath("$.nroCelular").value("987654321"));
+  update(admin,Map.of("nroCelular","987654321","direccion","Dirección con acentos: Perú")).andExpect(status().isOk()).andExpect(jsonPath("$.nroCelular").value("987654321"));
   mvc.perform(get("/api/propietarios/me").header("Authorization",owner)).andExpect(jsonPath("$.direccion").value("Dirección con acentos: Perú")).andExpect(jsonPath("$.nroCelular").value("987654321"));
   mvc.perform(get("/api/usuarios/{id}",ownerUser).header("Authorization",admin)).andExpect(jsonPath("$.direccionContacto").value("Dirección con acentos: Perú"));
   mvc.perform(get("/api/usuarios/me").header("Authorization",owner)).andExpect(jsonPath("$.nroCelular").value("987654321")).andExpect(jsonPath("$.direccionContacto").value("Dirección con acentos: Perú"));
@@ -47,12 +47,12 @@ class PropietariosAdminHttpIT extends PostgresIntegrationSupport {
   assertEquals("Persona",db.queryForObject("select nombres from usuario where id_usuario=?",String.class,ownerUser));
   assertEquals(ownerUser,db.queryForObject("select id_usuario from propietario where id_propietario=?",Long.class,ownerId));
   db.update("update usuario set direccion_contacto='Referencia antigua' where id_usuario=?",ownerUser);
-  update(admin,Map.of("idUsuario",ownerUser,"nroCelular","","direccion","")).andExpect(status().isOk());
+  update(admin,Map.of("nroCelular","","direccion","")).andExpect(status().isOk());
   mvc.perform(get("/api/usuarios/{id}",ownerUser).header("Authorization",admin)).andExpect(jsonPath("$.direccionContacto").value(""));
   mvc.perform(get("/api/usuarios/me").header("Authorization",owner)).andExpect(jsonPath("$.nroCelular").value("")).andExpect(jsonPath("$.direccionContacto").value(""));
  }
  @Test void validacionYCamposProtegidosRechazanCambiosAtomicos()throws Exception{
-  for(String phone:List.of("abc","887654321","98765432","9876543210","+51987654321"))update(admin,Map.of("idUsuario",ownerUser,"nroCelular",phone,"direccion","No guardar")).andExpect(status().isBadRequest());
+  for(String phone:List.of("abc","887654321","98765432","9876543210","+51987654321"))update(admin,Map.of("nroCelular",phone,"direccion","No guardar")).andExpect(status().isBadRequest());
   update(admin,Map.of("idUsuario",otherUser,"nroCelular","987654321","direccion","No reasociar")).andExpect(status().isBadRequest());
   for(String field:List.of("nombres","apellidos","correo","nroDocumento","idRol","contrasena"))update(admin,Map.of("idUsuario",ownerUser,"direccion","No guardar",field,"No permitido")).andExpect(status().isBadRequest());
   assertEquals("Dirección inicial",db.queryForObject("select direccion from propietario where id_propietario=?",String.class,ownerId));

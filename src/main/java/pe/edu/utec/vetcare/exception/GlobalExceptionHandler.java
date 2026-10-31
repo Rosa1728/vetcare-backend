@@ -13,6 +13,16 @@ import java.util.LinkedHashMap;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String,String>> solicitudInvalida(org.springframework.http.converter.HttpMessageNotReadableException ex) {
+        Throwable cause=ex;
+        while(cause!=null) {
+            if(cause instanceof BadRequestException bad)return ResponseEntity.badRequest().body(Map.of("error",bad.getMessage()));
+            cause=cause.getCause();
+        }
+        return ResponseEntity.badRequest().body(Map.of("error","La solicitud contiene campos no permitidos o datos inválidos."));
+    }
+
     @ExceptionHandler(CambioContrasenaInvalidoException.class)
     public ResponseEntity<?> cambioContrasena(CambioContrasenaInvalidoException ex) {
         return ResponseEntity.badRequest().body(Map.of("error",ex.getMessage(),"campos",ex.getCampos()));

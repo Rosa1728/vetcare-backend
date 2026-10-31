@@ -111,7 +111,7 @@ public class SecurityConfig {
                     .hasAnyRole("ADMIN", "VETERINARIO", "PROPIETARIO")
                 .requestMatchers(HttpMethod.GET, "/api/atenciones/**").hasAnyRole("ADMIN", "VETERINARIO", "PROPIETARIO")
                 .requestMatchers("/api/atenciones/**").hasAnyRole("ADMIN", "VETERINARIO")
-                .requestMatchers(HttpMethod.GET, "/api/publicaciones").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/publicaciones", "/api/publicaciones/pagina", "/api/publicaciones/{id:[0-9]+}").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/publicaciones/*/foto").permitAll()
                 .requestMatchers("/api/publicaciones/**").hasRole("PROPIETARIO")
                 .anyRequest().authenticated())

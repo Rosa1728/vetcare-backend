@@ -1,7 +1,6 @@
 package pe.edu.utec.vetcare.service;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -23,18 +22,17 @@ import java.util.List;
 public class RecordatorioVacunaService {
     private final RecordatorioVacunaRepository recordatorios;
     private final VacunaRepository vacunas;
-    @Value("${vetcare.recordatorios.zona:America/Lima}") private String zona;
+    private final java.time.Clock clock;
+    private static final ZoneId LIMA=ZoneId.of("America/Lima");
 
-    private LocalDate hoy() { return LocalDate.now(ZoneId.of(zona)); }
+    private LocalDate hoy() { return LocalDate.now(clock.withZone(LIMA)); }
 
     private RecordatorioVacunaResponse convertir(RecordatorioVacunaEntity r) {
         VacunaEntity v = r.getVacuna();
-        String mensaje = switch (r.getTipo()) {
-            case "DIA_7" -> "La próxima dosis es dentro de 7 días";
-            case "DIA_1" -> "La próxima dosis es mañana";
-            case "HOY" -> "La próxima dosis corresponde hoy";
-            default -> "La próxima dosis está vencida";
-        };
+        String fecha=r.getFechaDosis().format(java.time.format.DateTimeFormatter.ofPattern("d 'de' MMMM 'de' uuuu",java.util.Locale.forLanguageTag("es-PE")));
+        String mensaje="🐾 " + v.getMascota().getNombre() + " tiene " +
+                ("VENCIDA".equals(r.getTipo()) ? "pendiente" : "programada") + " su vacuna " + v.getNombre() +
+                " para el " + fecha + ". Revisa los detalles en Mis vacunas.";
         return new RecordatorioVacunaResponse(r.getIdRecordatorio(), v.getIdVacuna(),
                 v.getMascota().getIdMascota(), v.getMascota().getNombre(), v.getNombre(),
                 r.getFechaDosis(), r.getTipo(), mensaje, r.getCreadoEn(), r.getLeidoEn() != null);
@@ -45,7 +43,7 @@ public class RecordatorioVacunaService {
         if (!AccesoClinico.es("PROPIETARIO"))
             throw new AccessDeniedException("Solo el propietario consulta sus recordatorios");
         return recordatorios.findByVacuna_Mascota_Propietario_Usuario_CorreoOrderByCreadoEnDesc(AccesoClinico.correo())
-                .stream().filter(r -> r.getFechaDosis().equals(r.getVacuna().getProximaDosis()))
+                .stream().filter(r -> r.getFechaDosis().equals(r.getVacuna().getProximaDosis()) && !vacunas.existsByIdVacunaOrigen(r.getVacuna().getIdVacuna()))
                 .map(this::convertir).toList();
     }
 
@@ -57,12 +55,12 @@ public class RecordatorioVacunaService {
                 .orElseThrow(() -> new ResourceNotFoundException("Recordatorio no encontrado"));
         if (!AccesoClinico.esPropietario(r.getVacuna().getMascota()))
             throw new AccessDeniedException("Recordatorio de otro propietario");
-        if (r.getLeidoEn() == null) r.setLeidoEn(LocalDateTime.now(ZoneId.of(zona)));
+        if (r.getLeidoEn() == null) r.setLeidoEn(LocalDateTime.now(clock.withZone(LIMA)));
         return convertir(r);
     }
 
-    /** Ejecución nocturna; la clave única protege frente a reintentos. */
-    @Scheduled(cron = "${vetcare.recordatorios.cron:0 0 8 * * *}", zone = "${vetcare.recordatorios.zona:America/Lima}")
+    /** Recupera avisos aun si el servidor no estuvo activo en el instante exacto del umbral. */
+    @Scheduled(cron = "${vetcare.recordatorios.cron:0 */5 * * * *}", zone = "${vetcare.recordatorios.zona:America/Lima}")
     @Transactional
     public void ejecutarAutomaticamente() { generarPendientes(); }
 
@@ -72,23 +70,24 @@ public class RecordatorioVacunaService {
         return generarPendientes();
     }
 
+    /** Se invoca en la misma transacción al crear o editar una programación. No envía correo. */
+    @Transactional
+    public int sincronizar(VacunaEntity vacuna) {
+        if(vacuna.getProximaDosis()==null)return 0;
+        String tipo=tipoPendiente(hoy(),vacuna.getProximaDosis());
+        if(tipo==null)return 0;
+        return recordatorios.crearSiFalta(vacuna.getIdVacuna(),vacuna.getProximaDosis(),tipo,
+                LocalDateTime.now(clock.withZone(LIMA)));
+    }
+
+    static String tipoPendiente(LocalDate hoy,LocalDate fecha) {
+        long dias=java.time.temporal.ChronoUnit.DAYS.between(hoy,fecha);
+        return dias<0?"VENCIDA":dias==0?"HOY":dias==1?"DIA_1":dias<=7?"DIA_7":null;
+    }
+
     private int generarPendientes() {
-        LocalDate hoy = hoy();
-        int creados = 0;
-        for (VacunaEntity v : vacunas.findByProximaDosisIsNotNull()) {
-            LocalDate fecha = v.getProximaDosis();
-            long dias = java.time.temporal.ChronoUnit.DAYS.between(hoy, fecha);
-            String tipo = dias == 7 ? "DIA_7" : dias == 1 ? "DIA_1" : dias == 0 ? "HOY" :
-                    dias < 0 ? "VENCIDA" : null;
-            if (tipo == null || recordatorios.existsByVacuna_IdVacunaAndFechaDosisAndTipo(v.getIdVacuna(), fecha, tipo))
-                continue;
-            RecordatorioVacunaEntity r = new RecordatorioVacunaEntity();
-            r.setVacuna(v);
-            r.setFechaDosis(fecha);
-            r.setTipo(tipo);
-            recordatorios.save(r);
-            creados++;
-        }
+        int creados=0;
+        for(VacunaEntity v:vacunas.findByProximaDosisIsNotNull())creados+=sincronizar(v);
         return creados;
     }
 }

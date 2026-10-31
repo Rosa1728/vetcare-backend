@@ -41,6 +41,27 @@ public class HistoriaPublicacionController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No puedes modificar esta historia");
     }
     @GetMapping public List<Publicacion> publicas() { return publicaciones.findTop40ByOrderByFechaCreacionDesc().stream().map(this::dto).toList(); }
+    public record Pagina(List<Publicacion> content,int page,int size,long totalElements,int totalPages) {}
+    @GetMapping("/pagina")
+    public Pagina pagina(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="9") int size,
+                         @RequestParam(defaultValue="") String q,@RequestParam(defaultValue="") String categoria) {
+        if(page<0||size<1||size>9||q.length()>120||(!categoria.isEmpty()&&!List.of("Adopción","Recuperación","Celebración","Aventuras","Otros").contains(categoria)))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Revisa la página, búsqueda o categoría seleccionada");
+        String escaped=q.trim().toLowerCase(Locale.ROOT).replace("\\","\\\\").replace("%","\\%").replace("_","\\_");
+        var result=publicaciones.findAll((root,query,cb)->{
+            var filters=new ArrayList<jakarta.persistence.criteria.Predicate>();
+            if(!escaped.isEmpty())filters.add(cb.or(cb.like(cb.lower(root.get("titulo")),"%"+escaped+"%",'\\'),cb.like(cb.lower(root.get("mascota").get("nombre")),"%"+escaped+"%",'\\')));
+            if(!categoria.isEmpty())filters.add(cb.equal(root.get("categoria"),categoria));
+            return cb.and(filters.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        },org.springframework.data.domain.PageRequest.of(page,size,org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC,"fechaCreacion","id")));
+        return new Pagina(result.getContent().stream().map(this::dto).toList(),page,size,result.getTotalElements(),result.getTotalPages());
+    }
+    @GetMapping("/{id}")
+    public Publicacion detalle(@PathVariable Long id) { return dto(encontrar(id)); }
+    @GetMapping("/mis/{id}") @PreAuthorize("hasRole('PROPIETARIO')")
+    public Publicacion detallePropio(@PathVariable Long id,Authentication auth) {
+        var h=encontrar(id);propietario(h,auth);return dto(h);
+    }
     @GetMapping("/mis") @PreAuthorize("hasRole('PROPIETARIO')")
     public List<Publicacion> mias(Authentication auth) {
         return publicaciones.findByMascotaPropietarioUsuarioCorreoOrderByFechaCreacionDesc(auth.getName()).stream().map(this::dto).toList();

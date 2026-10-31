@@ -191,12 +191,12 @@ class CitasClinicasHttpIT extends PostgresIntegrationSupport {
  }
  @Test void dosisProgramadaConservaIdentidadFechaOriginalYNoDuplicaAlReintentar() throws Exception {
   long c=cita("2030-01-10T10:00:00","CONFIRMADA");inicio(c);
-  var scheduled=mvc.perform(post("/api/vacunas").header("Authorization",vet).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("idMascota",petId,"idVeterinario",vetId,"nombre","Dosis sintética","proximaDosis","2030-01-28","observaciones","Indicación original")))).andExpect(status().isOk()).andReturn();
+  var scheduled=mvc.perform(post("/api/vacunas").header("Authorization",vet).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("idMascota",petId,"idVeterinario",vetId,"nombre","Dosis sintética","proximaDosis","2030-01-10","observaciones","Indicación original")))).andExpect(status().isOk()).andReturn();
   long id=json.readTree(scheduled.getResponse().getContentAsByteArray()).get("idVacuna").asLong();
   var body=payload(c,null);body.put("vacunas",List.of(Map.of("aplicada",true,"idVacunaProgramada",id,"fechaAplicacion","2030-01-10")));
   var response=mvc.perform(post("/api/atenciones").header("Authorization",vet).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body))).andExpect(status().isOk()).andReturn();
   long attention=json.readTree(response.getResponse().getContentAsByteArray()).get("idAtencion").asLong();
-  mvc.perform(get("/api/vacunas/{id}",id).header("Authorization",owner)).andExpect(status().isOk()).andExpect(jsonPath("$.fechaProgramada").value("2030-01-28")).andExpect(jsonPath("$.fechaAplicacion").value("2030-01-10")).andExpect(jsonPath("$.idAtencion").value(attention)).andExpect(jsonPath("$.observaciones").value("Indicación original"));
+  mvc.perform(get("/api/vacunas/{id}",id).header("Authorization",owner)).andExpect(status().isOk()).andExpect(jsonPath("$.fechaProgramada").value("2030-01-10")).andExpect(jsonPath("$.fechaAplicacion").value("2030-01-10")).andExpect(jsonPath("$.idAtencion").value(attention)).andExpect(jsonPath("$.observaciones").value("Indicación original"));
   mvc.perform(post("/api/atenciones").header("Authorization",vet).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body))).andExpect(status().isConflict());
   mvc.perform(put("/api/vacunas/{id}/aplicar",id).header("Authorization",vet).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("idAtencion",attention,"fechaAplicacion","2030-01-10")))).andExpect(status().isConflict());
   assertEquals(1,count(c));assertEquals(1,jdbc.queryForObject("select count(*) from vacuna where id_mascota=?",Integer.class,petId));

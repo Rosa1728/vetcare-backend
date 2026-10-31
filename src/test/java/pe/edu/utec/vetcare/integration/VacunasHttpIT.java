@@ -37,7 +37,7 @@ class VacunasHttpIT extends PostgresIntegrationSupport {
     }
     @Test void cicloPersistidoVeterinarioPropietarioEHistoriaSinDuplicar() throws Exception {
         long id=schedule();String notes="áéíóúñ".repeat(83)+"áé";assertEquals(500,notes.length());
-        mvc.perform(put("/api/vacunas/{id}/programacion",id).header("Authorization",vet).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("nombre","Antirrábica","proximaDosis",today.plusDays(30).toString(),"observaciones",notes))))
+        mvc.perform(put("/api/vacunas/{id}/programacion",id).header("Authorization",vet).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("nombre","Antirrábica","proximaDosis",today.toString(),"observaciones",notes))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.idVacuna").value(id));
         mvc.perform(get("/api/vacunas/mascota/{id}",pet).header("Authorization",owner)).andExpect(status().isOk()).andExpect(jsonPath("$[?(@.idVacuna == "+id+")].observaciones").value(org.hamcrest.Matchers.contains(notes)));
         mvc.perform(get("/api/historias-clinicas/mascota/{id}",pet).header("Authorization",owner)).andExpect(status().isOk()).andExpect(jsonPath("$.idHistoria").value(history));
@@ -101,7 +101,7 @@ class VacunasHttpIT extends PostgresIntegrationSupport {
         }finally{pool.shutdownNow();}
         assertEquals(1,jdbc.queryForObject("select count(*) from vacuna where id_atencion=? and nombre='Vacuna directa'",Integer.class,attention));
     }
-    private Map<String,Object> scheduleBody(){return new HashMap<>(Map.of("idMascota",pet,"idVeterinario",vetId,"nombre","Antirrábica","proximaDosis",today.plusDays(15).toString(),"observaciones","Traer cartilla registrada."));}
+    private Map<String,Object> scheduleBody(){return new HashMap<>(Map.of("idMascota",pet,"idVeterinario",vetId,"nombre","Antirrábica","proximaDosis",today.toString(),"observaciones","Traer cartilla registrada."));}
     private long schedule() throws Exception {var r=mvc.perform(post("/api/vacunas").header("Authorization",vet).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(scheduleBody()))).andExpect(status().isOk()).andReturn();return json.readTree(r.getResponse().getContentAsByteArray()).get("idVacuna").asLong();}
     private org.springframework.test.web.servlet.ResultActions apply(String token,long id,long att) throws Exception {return mvc.perform(put("/api/vacunas/{id}/aplicar",id).header("Authorization",token).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("idAtencion",att,"fechaAplicacion",today.toString(),"proximaDosis",today.plusDays(90).toString(),"observaciones","Observación registrada\nSeguimiento clínico."))));}
     private long user(String role,String name){return jdbc.queryForObject("insert into usuario (nombres,apellidos,tipo_documento,nro_documento,correo,contrasena,id_rol,fecha_registro) values ('Cuenta','Vacunas','PRUEBA',?,?,?,(select id_rol from roles where nombre=?),current_timestamp) returning id_usuario",Long.class,UUID.randomUUID().toString().substring(0,18),name+"@example.invalid",passwords.encode(password),role);}

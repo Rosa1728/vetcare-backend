@@ -41,13 +41,13 @@ class AdminHttpIT extends PostgresIntegrationSupport {
   long id=json.readTree(r.getResponse().getContentAsByteArray()).get("idVeterinario").asLong();
   String token=login("new");mvc.perform(get("/api/veterinarios/me").header("Authorization",token)).andExpect(jsonPath("$.tratamientoProfesional").value("Dr."));
   String hash=db.queryForObject("select contrasena from usuario where correo=?",String.class,email("new"));assertTrue(encoder.matches(password,hash));assertNotEquals(password,hash);
-  putJson("/api/veterinarios/"+id,admin,Map.of("especialidad","General actualizada","nroColegiatura","NEW-"+key)).andExpect(status().isOk()).andExpect(jsonPath("$.tratamientoProfesional").value("Dr."));
-  putJson("/api/veterinarios/"+id,admin,Map.of("especialidad","Cirugía","nroColegiatura","NEW-"+key,"tratamientoProfesional","Dra.","datosUsuario",Map.of("nombres","Veterinario corregido","apellidos","Sintético","tipoDocumento","PRUEBA","nroDocumento","NEW-"+key,"correo",email("new")))).andExpect(status().isOk());
+  putJson("/api/veterinarios/"+id,admin,Map.of("especialidad","General actualizada")).andExpect(status().isOk()).andExpect(jsonPath("$.tratamientoProfesional").value("Dr."));
+  putJson("/api/veterinarios/"+id,admin,Map.of("especialidad","Cirugía","tratamientoProfesional","Dra.","datosUsuario",Map.of("nroCelular","999111222","direccion","Dirección actualizada"))).andExpect(status().isOk());
   mvc.perform(get("/api/veterinarios/me").header("Authorization",token)).andExpect(jsonPath("$.tratamientoProfesional").value("Dra."));
   mvc.perform(patch("/api/veterinarios/me").header("Authorization",token).contentType(MediaType.APPLICATION_JSON).content("{\"nroCelular\":\"999888777\",\"direccion\":\"Dirección sintética\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.tratamientoProfesional").value("Dra."));
   mvc.perform(patch("/api/veterinarios/me").header("Authorization",token).contentType(MediaType.APPLICATION_JSON).content("{\"tratamientoProfesional\":\"Dr.\"}")).andExpect(status().isBadRequest());
   putJson("/api/veterinarios/"+id,token,Map.of("especialidad","General","nroColegiatura","NEW-"+key,"tratamientoProfesional","Dr.")).andExpect(status().isForbidden());
-  putJson("/api/veterinarios/"+id,admin,Map.of("especialidad","Cirugía","nroColegiatura","NEW-"+key,"tratamientoProfesional","")).andExpect(status().isOk()).andExpect(jsonPath("$.tratamientoProfesional").isEmpty());
+  putJson("/api/veterinarios/"+id,admin,Map.of("especialidad","Cirugía","tratamientoProfesional","")).andExpect(status().isOk()).andExpect(jsonPath("$.tratamientoProfesional").isEmpty());
  }
  @Test void validacionDeTratamientoDuplicadosYEdicionAtomica() throws Exception {
   var body=registration();body.put("tratamientoProfesional","DRA");postJson("/api/veterinarios/registro",admin,body).andExpect(status().isBadRequest());
@@ -112,7 +112,7 @@ class AdminHttpIT extends PostgresIntegrationSupport {
   long id=json.readTree(result.getResponse().getContentAsByteArray()).get("idUsuario").asLong();
   String original=db.queryForObject("select contrasena from usuario where id_usuario=?",String.class,id);assertTrue(encoder.matches(password,original));
   postJson("/api/usuarios",admin,body).andExpect(status().isBadRequest());
-  var edit=new HashMap<String,Object>(body);edit.remove("contrasena");edit.remove("idRol");edit.put("nombres","Nombre corregido");
+  var edit=new HashMap<String,Object>();edit.put("nroCelular","987654321");edit.put("direccion","Dirección nueva");
   putJson("/api/usuarios/"+id,admin,edit).andExpect(status().isOk());
   assertEquals(original,db.queryForObject("select contrasena from usuario where id_usuario=?",String.class,id));
   assertEquals(role,db.queryForObject("select id_rol from usuario where id_usuario=?",Long.class,id));

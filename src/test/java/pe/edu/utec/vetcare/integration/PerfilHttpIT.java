@@ -58,7 +58,7 @@ class PerfilHttpIT extends PostgresIntegrationSupport {
     @Test void veterinarioSoloEditaContactoYConservaTratamientoAsignadoPorAdmin() throws Exception {
         long id=jdbc.queryForObject("select id_veterinario from veterinario where id_usuario=?",Long.class,vetId);
         mvc.perform(put("/api/veterinarios/{id}",id).header("Authorization",admin).contentType(MediaType.APPLICATION_JSON)
-            .content(json.writeValueAsString(Map.of("especialidad","Cirugía","nroColegiatura","IT-"+suffix,"tratamientoProfesional","Dra."))))
+            .content(json.writeValueAsString(Map.of("especialidad","Cirugía","tratamientoProfesional","Dra."))))
             .andExpect(status().isOk());
         mvc.perform(patch("/api/veterinarios/me").header("Authorization",vet).contentType(MediaType.APPLICATION_JSON)
             .content("{\"nroCelular\":\"987222333\",\"direccion\":\"Dirección sintética\"}"))
@@ -112,8 +112,7 @@ class PerfilHttpIT extends PostgresIntegrationSupport {
     @Test void administradorConservaIdentidadPropiaYRechazaDuplicadosAjenos() throws Exception {
         var current=jdbc.queryForMap("select * from usuario where id_usuario=?",ownerId);
         var payload=new java.util.HashMap<String,Object>();
-        payload.put("nombres","Prueba"); payload.put("apellidos","Perfil"); payload.put("tipoDocumento",current.get("tipo_documento"));
-        payload.put("nroDocumento",current.get("nro_documento")); payload.put("correo",current.get("correo")); payload.put("nroCelular","999111222");
+        payload.put("nroCelular","999111222");
         mvc.perform(put("/api/usuarios/{id}",ownerId).header("Authorization",admin).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(payload))).andExpect(status().isOk());
         payload.put("correo",jdbc.queryForObject("select correo from usuario where id_usuario=?",String.class,strangerId));
         mvc.perform(put("/api/usuarios/{id}",ownerId).header("Authorization",admin).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(payload))).andExpect(status().isBadRequest());

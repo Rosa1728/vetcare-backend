@@ -70,15 +70,8 @@ public class VeterinarioServiceImpl implements VeterinarioService {
         VeterinarioEntity veterinario = buscarPorCorreoAutenticado(correoAutenticado);
         UsuarioEntity usuario = veterinario.getUsuario();
 
-        if (request.getNroCelular() == null && request.getDireccion() == null) {
-            throw new BadRequestException("Debe indicar al menos un campo para actualizar");
-        }
-        if (request.getNroCelular() != null) {
-            if (request.getNroCelular().isBlank()) {
-                throw new BadRequestException("El celular no puede estar vacío");
-            }
-            usuario.setNroCelular(request.getNroCelular().trim());
-        }
+        pe.edu.utec.vetcare.validation.ContactoEdicion.validar(request.getNroCelular(),request.getDireccion(),false);
+        if(request.getNroCelular()!=null)usuario.setNroCelular(request.getNroCelular());
         if (request.getDireccion() != null) {
             usuario.setDireccionContacto(request.getDireccion().trim());
         }
@@ -87,6 +80,8 @@ public class VeterinarioServiceImpl implements VeterinarioService {
     }
 
     private VeterinarioEntity buscarPorCorreoAutenticado(String correo) {
+        if(!pe.edu.utec.vetcare.security.AccesoClinico.es("VETERINARIO")||!pe.edu.utec.vetcare.security.AccesoClinico.correo().equals(correo))
+            throw new org.springframework.security.access.AccessDeniedException("Solo puedes consultar o actualizar tu propio perfil veterinario");
         UsuarioEntity usuario = usuarioRepository.findByCorreo(correo)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario autenticado no encontrado"));
         return veterinarioRepository.findByUsuario_IdUsuario(usuario.getIdUsuario())
@@ -154,6 +149,7 @@ public class VeterinarioServiceImpl implements VeterinarioService {
     public VeterinarioResponse update(
             Long id,
             UpdateVeterinarioRequest request) {
+        pe.edu.utec.vetcare.security.AccesoClinico.soloAdmin();
 
         VeterinarioEntity entity =
                 veterinarioRepository.findById(id)
@@ -163,13 +159,12 @@ public class VeterinarioServiceImpl implements VeterinarioService {
                                 )
                         );
 
-        pe.edu.utec.vetcare.security.AccesoClinico.soloAdmin();
-        if (!entity.getNroColegiatura().equals(request.getNroColegiatura())
-                && veterinarioRepository.existsByNroColegiatura(request.getNroColegiatura())) {
-            throw new BadRequestException("El número de colegiatura ya está registrado");
-        }
+        if(request.getEspecialidad()==null||request.getEspecialidad().isBlank()||request.getEspecialidad().length()>100)
+            throw new BadRequestException("Indica una especialidad de hasta 100 caracteres.");
+        if(request.getTratamientoProfesional()!=null&&!java.util.List.of("","Dr.","Dra.").contains(request.getTratamientoProfesional()))
+            throw new BadRequestException("Selecciona Dr., Dra. o Sin tratamiento");
         if (request.getDatosUsuario() != null) usuarios.actualizar(entity.getUsuario().getIdUsuario(), request.getDatosUsuario());
-        veterinarioMapper.updateEntity(request, entity);
+        entity.setEspecialidad(request.getEspecialidad());
         if (request.getTratamientoProfesional() != null) entity.setTratamientoProfesional(normalizarTratamiento(request.getTratamientoProfesional()));
 
         VeterinarioEntity updatedEntity =

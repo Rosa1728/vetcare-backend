@@ -29,11 +29,8 @@ public interface UsuarioMapper {
     @Mapping(target="fotoDisponible", expression="java(entity.getFotoPerfil() != null)")
     UsuarioResponse toResponse(UsuarioEntity entity);
 
-    @Mapping(target = "idUsuario", ignore = true)
-    @Mapping(target = "rol", ignore = true)
-    @Mapping(target = "fechaRegistro", ignore = true)
-    @Mapping(target = "contrasena", ignore = true)
-    @Mapping(target = "fotoPerfil", ignore = true)
+    @org.mapstruct.BeanMapping(ignoreByDefault=true, nullValuePropertyMappingStrategy=org.mapstruct.NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target="nroCelular", source="nroCelular")
     void updateEntity(
             ActualizarUsuarioRequest request,
             @MappingTarget UsuarioEntity entity

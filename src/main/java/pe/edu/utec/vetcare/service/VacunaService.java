@@ -31,6 +31,7 @@ public class VacunaService {
     private final VeterinarioRepository veterinarios;
     private final AtencionRepository atenciones;
     private final EntityManager entityManager;
+    private final RecordatorioVacunaService recordatorios;
 
     private void puedeConsultar(MascotaEntity mascota) {
         if (AccesoClinico.es("ADMIN") || (AccesoClinico.es("PROPIETARIO") && AccesoClinico.esPropietario(mascota))) return;
@@ -70,6 +71,10 @@ public class VacunaService {
 
     @Transactional
     public VacunaResponse registrar(CrearVacunaRequest request) {
+        return registrarEnAtencion(request,false);
+    }
+
+    private VacunaResponse registrarEnAtencion(CrearVacunaRequest request,boolean duranteRegistro) {
         if (!AccesoClinico.es("VETERINARIO"))
             throw new AccessDeniedException("Solo un veterinario puede registrar vacunas o programar dosis");
         validarFechas(request.fechaAplicacion(), request.proximaDosis());
@@ -100,6 +105,7 @@ public class VacunaService {
                 .noneMatch(p -> p.getIdMascota().equals(m.getIdMascota()))) {
             throw new AccessDeniedException("No puedes programar vacunas de una mascota sin relación clínica");
         }
+        if (atencion != null) validarAtencion(atencion,request.fechaAplicacion(),duranteRegistro,false);
         if (atencion != null) entityManager.lock(atencion, LockModeType.PESSIMISTIC_WRITE);
         if (atencion != null && vacunas.existsByAtencion_IdAtencionAndNombreIgnoreCase(atencion.getIdAtencion(), request.nombre().trim()))
             throw new EstadoVacunaInvalidoException("Esta vacuna ya tiene una aplicación en la atención seleccionada");
@@ -114,12 +120,17 @@ public class VacunaService {
         v.setFechaProgramada(v.getFechaAplicacion() == null ? v.getProximaDosis() : null);
         vacunas.saveAndFlush(v);
         programarSiguiente(v);
+        recordatorios.sincronizar(v);
         return toResponse(v);
     }
 
     /** Confirma una dosis previamente programada sin perder el registro ni crear otro. */
     @Transactional
     public VacunaResponse aplicar(Long idVacuna, AplicarVacunaRequest request) {
+        return aplicarEnAtencion(idVacuna,request,false);
+    }
+
+    private VacunaResponse aplicarEnAtencion(Long idVacuna, AplicarVacunaRequest request, boolean duranteRegistro) {
         if (!AccesoClinico.es("VETERINARIO"))
             throw new AccessDeniedException("Solo un veterinario puede confirmar vacunas aplicadas");
         VacunaEntity vacuna = vacunas.findLockedById(idVacuna)
@@ -135,6 +146,10 @@ public class VacunaService {
         if (!atencion.getCita().getMascota().getIdMascota().equals(vacuna.getMascota().getIdMascota()) ||
                 !atencion.getVeterinarioAtencion().getIdVeterinario().equals(vacuna.getVeterinario().getIdVeterinario()))
             throw new BadRequestException("La atención no corresponde a esta mascota y veterinario");
+        LocalDate programada=vacuna.getFechaProgramada()!=null?vacuna.getFechaProgramada():vacuna.getProximaDosis();
+        if(programada==null||request.fechaAplicacion().isBefore(programada))
+            throw new BadRequestException("La aplicación no puede ser anterior a la fecha programada de vacunación");
+        validarAtencion(atencion,request.fechaAplicacion(),duranteRegistro,true);
         if (!request.fechaAplicacion().equals(atencion.getFechaAtencion().toLocalDate()))
             throw new BadRequestException("La fecha de aplicación debe corresponder al día de la atención clínica");
         if (request.proximaDosis() != null && !request.proximaDosis().isAfter(request.fechaAplicacion()))
@@ -172,14 +187,14 @@ public class VacunaService {
                 throw new BadRequestException("La aplicación no puede ser posterior a la atención");
             if (r.idVacunaProgramada() != null) {
                 // La fila conserva su identidad; aplicar() bloquea y rechaza una segunda aplicación.
-                aplicar(r.idVacunaProgramada(), new AplicarVacunaRequest(atencion.getIdAtencion(), r.fechaAplicacion(), r.proximaDosis(), r.observaciones()));
+                aplicarEnAtencion(r.idVacunaProgramada(), new AplicarVacunaRequest(atencion.getIdAtencion(), r.fechaAplicacion(), r.proximaDosis(), r.observaciones()),true);
             } else {
                 if (r.nombre() == null || r.nombre().isBlank()) throw new BadRequestException("Indica el nombre de la vacuna");
                 if (!nombres.add(r.nombre().trim().toLowerCase(java.util.Locale.ROOT)))
                     throw new EstadoVacunaInvalidoException("La vacuna está repetida en esta atención");
-                registrar(new CrearVacunaRequest(atencion.getCita().getMascota().getIdMascota(),
+                registrarEnAtencion(new CrearVacunaRequest(atencion.getCita().getMascota().getIdMascota(),
                         atencion.getVeterinarioAtencion().getIdVeterinario(), r.aplicada() ? atencion.getIdAtencion() : null,
-                        r.nombre(), r.aplicada() ? r.fechaAplicacion() : null, r.proximaDosis(), r.observaciones()));
+                        r.nombre(), r.aplicada() ? r.fechaAplicacion() : null, r.proximaDosis(), r.observaciones()),true);
             }
         }
     }
@@ -191,6 +206,20 @@ public class VacunaService {
         siguiente.setNombre(aplicada.getNombre()); siguiente.setProximaDosis(aplicada.getProximaDosis());
         siguiente.setFechaProgramada(aplicada.getProximaDosis()); siguiente.setIdVacunaOrigen(aplicada.getIdVacuna());
         siguiente.setObservaciones(aplicada.getObservaciones()); vacunas.saveAndFlush(siguiente);
+        recordatorios.sincronizar(siguiente);
+    }
+
+    private void validarAtencion(AtencionEntity atencion, LocalDate aplicacion, boolean duranteRegistro, boolean mismoDia) {
+        var cita=atencion.getCita();
+        boolean estadoValido=cita!=null && (cita.getEstado()==pe.edu.utec.vetcare.enums.EstadoCita.ATENDIDA ||
+                (duranteRegistro && cita.getEstado()==pe.edu.utec.vetcare.enums.EstadoCita.CONFIRMADA));
+        if(!estadoValido)throw new BadRequestException("La aplicación requiere una cita y atención clínica válidas; no admite citas canceladas o sin asistencia");
+        if(!cita.getVeterinario().getIdVeterinario().equals(atencion.getVeterinarioAtencion().getIdVeterinario()) ||
+                !atencion.getHistoriaClinica().getMascota().getIdMascota().equals(cita.getMascota().getIdMascota()))
+            throw new BadRequestException("La cita, la atención y el expediente deben corresponder al mismo paciente y veterinario");
+        if((mismoDia ? !aplicacion.equals(atencion.getFechaAtencion().toLocalDate()) : aplicacion.isAfter(atencion.getFechaAtencion().toLocalDate())) ||
+                atencion.getFechaAtencion().isBefore(cita.getFechaCita()))
+            throw new BadRequestException("La fecha real de aplicación debe corresponder a la atención clínica (Lima)");
     }
 
     private void validarFechas(LocalDate aplicacion, LocalDate proxima) {
@@ -216,7 +245,9 @@ public class VacunaService {
         v.setProximaDosis(request.proximaDosis());
         v.setFechaProgramada(request.proximaDosis());
         v.setObservaciones(request.observaciones());
-        return toResponse(vacunas.saveAndFlush(v));
+        vacunas.saveAndFlush(v);
+        recordatorios.sincronizar(v);
+        return toResponse(v);
     }
 
     @Transactional

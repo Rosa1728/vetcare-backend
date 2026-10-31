@@ -41,7 +41,8 @@ public class CambioContrasenaService {
   var u=usuarios.findById(id).orElseThrow(()->new ResourceNotFoundException("Usuario autenticado no encontrado"));
   em.refresh(u,LockModeType.PESSIMISTIC_WRITE);
   if(request.contrasenaActual().getBytes(java.nio.charset.StandardCharsets.UTF_8).length>72 || !encoder.matches(request.contrasenaActual(),u.getContrasena()))throw new CambioContrasenaInvalidoException("contrasenaActual","La contraseña actual es incorrecta.");
-  if(!PoliticaContrasena.segura(request.nuevaContrasena()))throw new CambioContrasenaInvalidoException("nuevaContrasena","Usa al menos 8 caracteres con mayúscula, minúscula, número y símbolo. Evita contraseñas comunes; si es demasiado larga, elige una más corta.");
+  String error=PoliticaContrasena.error(request.nuevaContrasena());
+  if(!error.isEmpty())throw new CambioContrasenaInvalidoException("nuevaContrasena",error);
   if(!request.nuevaContrasena().equals(request.confirmarContrasena()))throw new CambioContrasenaInvalidoException("confirmarContrasena","Las contraseñas no coinciden.");
   if(encoder.matches(request.nuevaContrasena(),u.getContrasena()))throw new CambioContrasenaInvalidoException("nuevaContrasena","Elige una contraseña diferente de la actual.");
   u.setContrasena(encoder.encode(request.nuevaContrasena()));usuarios.saveAndFlush(u);

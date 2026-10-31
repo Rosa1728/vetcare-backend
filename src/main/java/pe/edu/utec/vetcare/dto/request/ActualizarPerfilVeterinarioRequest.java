@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 public class ActualizarPerfilVeterinarioRequest {
     @Size(max = 20, message = "El celular no puede superar 20 caracteres")
-    @Pattern(regexp="\\+?[0-9][0-9 ()-]{5,19}", message="Indica un celular válido de 6 a 20 caracteres")
+    @Pattern(regexp="|\\+?[0-9][0-9 ()-]{5,19}", message="Indica un celular válido de 6 a 20 caracteres")
     private String nroCelular;
 
     @Size(max = 200, message = "La dirección admite hasta 200 caracteres")

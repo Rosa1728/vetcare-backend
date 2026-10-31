@@ -89,6 +89,8 @@ public class UsuarioController {
     @org.springframework.transaction.annotation.Transactional
     public UsuarioResponse actualizarContacto(@AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody pe.edu.utec.vetcare.dto.request.ContactoAdminRequest request) {
+        pe.edu.utec.vetcare.security.AccesoClinico.soloAdmin();
+        pe.edu.utec.vetcare.validation.ContactoEdicion.validar(request.nroCelular(),request.direccion(),true);
         var u = usuarioRepository.findById(idActual(jwt)).orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
         if (request.nroCelular() == null && request.direccion() == null) throw new pe.edu.utec.vetcare.exception.BadRequestException("Indica celular o dirección");
         if (request.nroCelular() != null) u.setNroCelular(request.nroCelular().trim());

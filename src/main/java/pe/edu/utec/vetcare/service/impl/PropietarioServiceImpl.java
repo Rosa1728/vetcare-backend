@@ -10,6 +10,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pe.edu.utec.vetcare.dto.request.PropietarioRequest;
+import pe.edu.utec.vetcare.dto.request.ActualizarUsuarioRequest;
 import pe.edu.utec.vetcare.dto.response.PropietarioResponse;
 import pe.edu.utec.vetcare.entity.PropietarioEntity;
 import pe.edu.utec.vetcare.entity.UsuarioEntity;
@@ -100,16 +101,12 @@ public class PropietarioServiceImpl
 
     @Override
     @Transactional
-    public PropietarioResponse actualizar(Long id, PropietarioRequest request) {
+    public PropietarioResponse actualizar(Long id, ActualizarUsuarioRequest request) {
         pe.edu.utec.vetcare.security.AccesoClinico.soloAdmin();
-        var entity = buscarPropietario(id);
-        if (!entity.getUsuario().getIdUsuario().equals(request.getIdUsuario()))
-            throw new BadRequestException("La cuenta asociada al propietario no se puede cambiar");
-        if (request.getNroCelular()!=null) {
-            entity.getUsuario().setNroCelular(request.getNroCelular());
-            usuarioRepository.save(entity.getUsuario());
-        }
-        propietarioMapper.updateEntity(request, entity);
+        pe.edu.utec.vetcare.validation.ContactoEdicion.validar(request.getNroCelular(),request.getDireccion(),true);
+        var entity=buscarPropietario(id);
+        if(request.getNroCelular()!=null) { entity.getUsuario().setNroCelular(request.getNroCelular());usuarioRepository.saveAndFlush(entity.getUsuario()); }
+        if(request.getDireccion()!=null)entity.setDireccion(request.getDireccion());
         return propietarioMapper.toResponse(propietarioRepository.saveAndFlush(entity));
     }
 
@@ -117,6 +114,7 @@ public class PropietarioServiceImpl
     @Transactional
     public PropietarioResponse actualizarMiDireccion(String direccion) {
         PropietarioEntity entity = propietarioAutenticado();
+        pe.edu.utec.vetcare.validation.ContactoEdicion.validar(null,direccion,false);
         entity.setDireccion(direccion);
         return propietarioMapper.toResponse(propietarioRepository.save(entity));
     }
@@ -127,12 +125,13 @@ public class PropietarioServiceImpl
             ActualizarPerfilPropietarioRequest request) {
         var propietario = propietarioAutenticado();
         var usuario = propietario.getUsuario();
-        if (request.getNroCelular()==null && request.getDireccion()==null)
-            throw new BadRequestException("Indica al menos un campo para actualizar");
+        pe.edu.utec.vetcare.validation.ContactoEdicion.validar(request.getNroCelular(),request.getDireccion(),false);
         if (request.getNroCelular()!=null) usuario.setNroCelular(request.getNroCelular().trim());
         if (request.getDireccion()!=null) propietario.setDireccion(request.getDireccion());
         propietarioRepository.saveAndFlush(propietario);
-        return usuarioMapper.toResponse(usuario);
+        var response=usuarioMapper.toResponse(usuario);
+        response.setDireccionContacto(propietario.getDireccion());
+        return response;
     }
 
     @Override
@@ -172,6 +171,7 @@ public class PropietarioServiceImpl
     }
 
     private PropietarioEntity propietarioAutenticado() {
+        if(!pe.edu.utec.vetcare.security.AccesoClinico.es("PROPIETARIO"))throw new AccessDeniedException("Solo puedes actualizar tu propio perfil de propietario");
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (!(authentication instanceof JwtAuthenticationToken jwtAuth)) {
             throw new AccessDeniedException("Acceso denegado");

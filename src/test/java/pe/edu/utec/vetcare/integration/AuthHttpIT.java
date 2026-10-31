@@ -74,6 +74,28 @@ class AuthHttpIT extends PostgresIntegrationSupport {
   assertEquals(1,db.queryForObject("select count(*) from propietario where id_usuario=? and direccion=?",Integer.class,id,"Dirección sintética áéíóúñ"));
   String token=login(body.get("correo").toString(),password);mvc.perform(get("/api/usuarios/me").header("Authorization","Bearer "+token)).andExpect(jsonPath("$.rol").value("PROPIETARIO"));
  }
+ // Preparada para PostgreSQL temporal; no forma parte de mvn test.
+ @Test void direccionOpcionalEnRegistroSePuedeGuardarLuegoDesdeMiPerfil()throws Exception{
+  for(String mode:List.of("ausente","null","vacia","informada")){
+   var body=registration();
+   if(mode.equals("ausente"))body.remove("direccion");
+   else if(mode.equals("null"))body.put("direccion",null);
+   else if(mode.equals("vacia"))body.put("direccion","");
+   String expected=(String)body.get("direccion");
+   var response=postJson("/api/auth/registro",body).andExpect(status().isCreated()).andReturn();
+   long id=json.readTree(response.getResponse().getContentAsByteArray()).get("idUsuario").asLong();
+   assertEquals(expected,db.queryForObject("select direccion from propietario where id_usuario=?",String.class,id));
+   String hash=db.queryForObject("select contrasena from usuario where id_usuario=?",String.class,id);
+   String authorization="Bearer "+login(body.get("correo").toString(),password);
+   String address="Dirección posterior 456";
+   mvc.perform(patch("/api/propietarios/me").header("Authorization",authorization)
+    .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("direccion",address)))).andExpect(status().isOk());
+   mvc.perform(get("/api/propietarios/me").header("Authorization",authorization)).andExpect(status().isOk())
+    .andExpect(jsonPath("$.direccion").value(address));
+   assertEquals(address,db.queryForObject("select direccion from propietario where id_usuario=?",String.class,id));
+   assertEquals(hash,db.queryForObject("select contrasena from usuario where id_usuario=?",String.class,id));
+  }
+ }
  @Test void registroValidaDuplicadosDocumentosYPoliticaCompartida()throws Exception{
   var body=registration();postJson("/api/auth/registro",body).andExpect(status().isCreated());postJson("/api/auth/registro",body).andExpect(status().isBadRequest());
   body.put("correo","duplicate-"+key+"@example.invalid");postJson("/api/auth/registro",body).andExpect(status().isBadRequest());
