@@ -27,5 +27,5 @@ jobs:
 
       - name: Desplegar VetCare
         run: |
-          ssh -o BatchMode=yes vetcare-deploy@138.36.238.158 \
+          ssh -p 5298 -o BatchMode=yes vetcare-deploy@138.36.238.158 \
             'sudo -n /usr/local/sbin/vetcare-deploy'
